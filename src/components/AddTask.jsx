@@ -119,7 +119,10 @@ export default function AddTask() {
               type="text"
               placeholder="ID чата"
               value={telegramChatId}
-              onChange={(e) => setTelegramChatId(e.target.value)}
+              onChange={(e) => {
+                setTelegramChatId(e.target.value);
+                localStorage.setItem('telegramChatId', e.target.value);
+              }}
               onKeyDown={handleKeyDown}
               className="meta-input"
             />
