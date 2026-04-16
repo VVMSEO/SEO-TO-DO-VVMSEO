@@ -1,71 +1,62 @@
 const { onSchedule } = require("firebase-functions/v2/scheduler");
-const { defineSecret } = require("firebase-functions/params");
 const admin = require("firebase-admin");
 
 admin.initializeApp();
-const db = admin.firestore();
 
-const telegramBotToken = defineSecret("TELEGRAM_BOT_TOKEN");
-
-exports.sendReminders = onSchedule({
-  schedule: "every 1 minutes",
-  secrets: [telegramBotToken]
-}, async (event) => {
+exports.sendtelegramreminders = onSchedule("every 1 minutes", async (event) => {
+  const db = admin.firestore();
   const now = new Date();
-  const currentDateTime = now.toISOString().slice(0, 16); // "YYYY-MM-DDTHH:mm"
+  
+  const tasksRef = db.collection('tasks');
+  const snapshot = await tasksRef
+    .where('done', '==', false)
+    .where('reminded', '==', false)
+    .get();
 
-  try {
-    const tasksSnapshot = await db.collection("tasks")
-      .where("done", "==", false)
-      .where("reminded", "==", false)
-      .get();
-
-    if (tasksSnapshot.empty) {
-      console.log("No tasks to remind.");
-      return;
-    }
-
-    const promises = [];
-
-    tasksSnapshot.forEach((doc) => {
-      const task = doc.data();
-      
-      const taskDateTime = `${task.dueDate}T${task.dueTime}`;
-
-      if (taskDateTime <= currentDateTime) {
-        const token = telegramBotToken.value();
-        const chatId = task.telegramChatId;
-        const text = `⏰ Напоминание: ${task.title}\n${task.note || ''}\nВремя: ${task.dueDate} ${task.dueTime}`;
-
-        const url = `https://api.telegram.org/bot${token}/sendMessage`;
-        
-        const sendPromise = fetch(url, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            chat_id: chatId,
-            text: text
-          })
-        })
-        .then(async (response) => {
-          if (response.ok) {
-            await doc.ref.update({ reminded: true });
-            console.log(`Successfully reminded task ${doc.id}`);
-          } else {
-            console.error(`Failed to send Telegram message for task ${doc.id}: ${response.statusText}`);
-          }
-        })
-        .catch((error) => {
-          console.error(`Error sending Telegram message for task ${doc.id}:`, error);
-        });
-
-        promises.push(sendPromise);
-      }
-    });
-
-    await Promise.allSettled(promises);
-    console.log("Finished processing reminders.");
-  } catch (error) {
-    console.error("Error querying tasks:", error);
+  if (snapshot.empty) {
+    console.log('No tasks to remind.');
+    return;
   }
+
+  const botToken = process.env.TELEGRAM_BOT_TOKEN;
+  if (!botToken) {
+    console.error('TELEGRAM_BOT_TOKEN environment variable is not set.');
+    return;
+  }
+
+  const promises = [];
+
+  snapshot.forEach(doc => {
+    const task = doc.data();
+    if (!task.dueDate || !task.dueTime || !task.telegramChatId) return;
+
+    const taskDateTime = new Date(`${task.dueDate}T${task.dueTime}`);
+    
+    if (taskDateTime <= now) {
+      const message = `🔔 Напоминание: ${task.title}\n\n${task.note || ''}`;
+      
+      const fetchPromise = fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          chat_id: task.telegramChatId,
+          text: message
+        })
+      })
+      .then(res => res.json())
+      .then(data => {
+        if (data.ok) {
+          console.log(`Reminder sent for task ${doc.id}`);
+          return doc.ref.update({ reminded: true });
+        } else {
+          console.error(`Failed to send reminder for task ${doc.id}:`, data);
+        }
+      })
+      .catch(err => console.error(`Error sending to Telegram for task ${doc.id}:`, err));
+
+      promises.push(fetchPromise);
+    }
+  });
+
+  await Promise.all(promises);
 });

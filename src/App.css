@@ -193,7 +193,7 @@ body {
 }
 
 .title-input {
-  font-size: 2.5rem;
+  font-size: 1.5rem;
   font-weight: bold;
   border: none;
   outline: none;
@@ -230,6 +230,7 @@ body {
   padding-top: 24px;
   border-top: 1px solid var(--border-color);
   flex-wrap: wrap;
+  margin-bottom: 24px;
 }
 
 .form-group {
@@ -260,6 +261,23 @@ body {
 .meta-input:focus {
   border-color: var(--accent-yellow);
   background-color: #ffffff;
+}
+
+.add-btn {
+  background-color: var(--accent-yellow);
+  color: #000;
+  border: none;
+  padding: 12px 24px;
+  border-radius: 6px;
+  font-weight: 600;
+  cursor: pointer;
+  font-size: 1rem;
+  transition: background-color 0.2s;
+  align-self: flex-start;
+}
+
+.add-btn:hover {
+  background-color: var(--accent-yellow-hover);
 }
 
 .error-text {

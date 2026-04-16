@@ -126,6 +126,7 @@ export default function AddTask() {
           </div>
         </div>
         {error && <span className="error-text">{error}</span>}
+        <button type="submit" className="add-btn">Сохранить задачу</button>
       </form>
     </div>
   );
