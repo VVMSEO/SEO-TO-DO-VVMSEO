@@ -72,61 +72,106 @@ export default function TaskList() {
     return `***${chatId.slice(-4)}`;
   };
 
-  const activeTasks = tasks.filter(t => !t.done);
-  const completedTasks = tasks.filter(t => t.done);
+  const categorizeTasks = (tasksList) => {
+    const groups = {
+      overdue: [],
+      today: [],
+      tomorrow: [],
+      upcoming: [],
+      completed: []
+    };
+
+    const now = new Date();
+    const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+    
+    const tomorrowDate = new Date(now);
+    tomorrowDate.setDate(tomorrowDate.getDate() + 1);
+    const tomorrowStr = `${tomorrowDate.getFullYear()}-${String(tomorrowDate.getMonth() + 1).padStart(2, '0')}-${String(tomorrowDate.getDate()).padStart(2, '0')}`;
+
+    tasksList.forEach(task => {
+      if (task.done) {
+        groups.completed.push(task);
+        return;
+      }
+
+      if (!task.dueDate || !task.dueTime) {
+        groups.upcoming.push(task);
+        return;
+      }
+
+      const taskDateTime = new Date(`${task.dueDate}T${task.dueTime}`);
+      if (taskDateTime < now) {
+        groups.overdue.push(task);
+      } else if (task.dueDate === todayStr) {
+        groups.today.push(task);
+      } else if (task.dueDate === tomorrowStr) {
+        groups.tomorrow.push(task);
+      } else {
+        groups.upcoming.push(task);
+      }
+    });
+
+    return groups;
+  };
+
+  const groupedTasks = categorizeTasks(tasks);
+
+  const renderTaskCard = (task, isOverdue = false) => (
+    <div key={task.id} className={`task-card ${isOverdue ? 'overdue' : ''} ${task.done ? 'done' : ''}`}>
+      <div className="task-card-header">
+        <div className="task-title">{task.title}</div>
+        <div className="task-actions">
+          <input 
+            type="checkbox" 
+            checked={task.done} 
+            onChange={() => toggleDone(task)}
+            className="checkbox-input" 
+            title={task.done ? "Восстановить" : "Выполнено"} 
+          />
+          <button onClick={() => deleteTask(task.id)} className="delete-btn" title="Удалить">✕</button>
+        </div>
+      </div>
+      <div className="task-meta-info">
+        {formatDate(task.dueDate)} {task.dueTime} • ID: {maskChatId(task.telegramChatId)}
+      </div>
+      {task.note && <div className="task-note-preview">{task.note}</div>}
+    </div>
+  );
 
   return (
     <div className="task-list">
-      {activeTasks.length > 0 && <div className="list-title">Активные</div>}
-      {activeTasks.map(task => {
-        const overdue = isOverdue(task.dueDate, task.dueTime);
-        return (
-          <div key={task.id} className={`task-card ${overdue ? 'overdue' : ''}`}>
-            <div className="task-card-header">
-              <div className="task-title">{task.title}</div>
-              <div className="task-actions">
-                <input 
-                  type="checkbox" 
-                  checked={task.done} 
-                  onChange={() => toggleDone(task)}
-                  className="checkbox-input" 
-                  title="Выполнено" 
-                />
-                <button onClick={() => deleteTask(task.id)} className="delete-btn" title="Удалить">✕</button>
-              </div>
-            </div>
-            <div className="task-meta-info">
-              {formatDate(task.dueDate)} {task.dueTime} • ID: {maskChatId(task.telegramChatId)}
-            </div>
-            {task.note && <div className="task-note-preview">{task.note}</div>}
-          </div>
-        );
-      })}
+      {groupedTasks.overdue.length > 0 && (
+        <>
+          <div className="list-title">Просроченные</div>
+          {groupedTasks.overdue.map(task => renderTaskCard(task, true))}
+        </>
+      )}
+
+      {groupedTasks.today.length > 0 && (
+        <>
+          <div className="list-title" style={{ marginTop: groupedTasks.overdue.length ? '24px' : '0' }}>Сегодня</div>
+          {groupedTasks.today.map(task => renderTaskCard(task))}
+        </>
+      )}
+
+      {groupedTasks.tomorrow.length > 0 && (
+        <>
+          <div className="list-title" style={{ marginTop: (groupedTasks.overdue.length || groupedTasks.today.length) ? '24px' : '0' }}>Завтра</div>
+          {groupedTasks.tomorrow.map(task => renderTaskCard(task))}
+        </>
+      )}
+
+      {groupedTasks.upcoming.length > 0 && (
+        <>
+          <div className="list-title" style={{ marginTop: (groupedTasks.overdue.length || groupedTasks.today.length || groupedTasks.tomorrow.length) ? '24px' : '0' }}>Предстоящие</div>
+          {groupedTasks.upcoming.map(task => renderTaskCard(task))}
+        </>
+      )}
       
-      {completedTasks.length > 0 && (
+      {groupedTasks.completed.length > 0 && (
         <>
           <div className="list-title" style={{ marginTop: '24px' }}>Завершенные</div>
-          {completedTasks.map(task => (
-            <div key={task.id} className="task-card done">
-              <div className="task-card-header">
-                <div className="task-title">{task.title}</div>
-                <div className="task-actions">
-                  <input 
-                    type="checkbox" 
-                    checked={task.done} 
-                    onChange={() => toggleDone(task)}
-                    className="checkbox-input" 
-                    title="Восстановить" 
-                  />
-                  <button onClick={() => deleteTask(task.id)} className="delete-btn" title="Удалить">✕</button>
-                </div>
-              </div>
-              <div className="task-meta-info">
-                {formatDate(task.dueDate)} {task.dueTime} • ID: {maskChatId(task.telegramChatId)}
-              </div>
-              {task.note && <div className="task-note-preview">{task.note}</div>}
-            </div>
-          ))}
+          {groupedTasks.completed.map(task => renderTaskCard(task))}
         </>
       )}
       
