@@ -1,0 +1,16 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Helper function to check if user is authenticated
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    match /tasks/{taskId} {
+      // Allow any authenticated user (including anonymous) to read and write tasks
+      // Note: In a production app, tasks should have an ownerId to restrict access.
+      allow read, write: if isAuthenticated();
+    }
+  }
+}
