@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { collection, query, onSnapshot, doc, updateDoc, deleteDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 
-export default function TaskList() {
+export default function TaskList({ onSelectTask, selectedTaskId }) {
   const [tasks, setTasks] = useState([]);
 
   useEffect(() => {
@@ -117,18 +117,35 @@ export default function TaskList() {
   const groupedTasks = categorizeTasks(tasks);
 
   const renderTaskCard = (task, isOverdue = false) => (
-    <div key={task.id} className={`task-card ${isOverdue ? 'overdue' : ''} ${task.done ? 'done' : ''}`}>
+    <div 
+      key={task.id} 
+      className={`task-card ${isOverdue ? 'overdue' : ''} ${task.done ? 'done' : ''} ${selectedTaskId === task.id ? 'selected' : ''}`}
+      onClick={() => onSelectTask(task)}
+    >
       <div className="task-card-header">
         <div className="task-title">{task.title}</div>
         <div className="task-actions">
           <input 
             type="checkbox" 
             checked={task.done} 
-            onChange={() => toggleDone(task)}
+            onChange={(e) => {
+              e.stopPropagation();
+              toggleDone(task);
+            }}
             className="checkbox-input" 
             title={task.done ? "Восстановить" : "Выполнено"} 
           />
-          <button onClick={() => deleteTask(task.id)} className="delete-btn" title="Удалить">✕</button>
+          <button 
+            onClick={(e) => {
+              e.stopPropagation();
+              deleteTask(task.id);
+              if (selectedTaskId === task.id) onSelectTask(null);
+            }} 
+            className="delete-btn" 
+            title="Удалить"
+          >
+            ✕
+          </button>
         </div>
       </div>
       <div className="task-meta-info">

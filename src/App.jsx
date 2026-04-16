@@ -1,9 +1,12 @@
+import { useState } from 'react';
 import AddTask from './components/AddTask';
 import TaskList from './components/TaskList';
 import { db } from './firebase';
 import './App.css';
 
 function App() {
+  const [selectedTask, setSelectedTask] = useState(null);
+
   if (!db) {
     return (
       <div className="app-container offline">
@@ -24,14 +27,18 @@ function App() {
       <aside className="sidebar">
         <div className="sidebar-header">
           <h2>Заметки</h2>
-          <button type="submit" form="add-task-form" className="new-note-btn">
+          <button 
+            type="button" 
+            className="new-note-btn"
+            onClick={() => setSelectedTask(null)}
+          >
             + Добавить задачу
           </button>
         </div>
-        <TaskList />
+        <TaskList onSelectTask={setSelectedTask} selectedTaskId={selectedTask?.id} />
       </aside>
       <main className="main-content">
-        <AddTask />
+        <AddTask selectedTask={selectedTask} onClearSelection={() => setSelectedTask(null)} />
       </main>
     </div>
   );
