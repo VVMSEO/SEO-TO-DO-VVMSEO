@@ -11,7 +11,7 @@ function App() {
     return (
       <div className="app-container offline">
         <header className="header">
-          <h1>Заметки</h1>
+          <h1>СПИСОК ДЕЛ</h1>
           <div style={{ fontSize: '0.8rem', color: '#ff4d4d' }}>● System Offline</div>
         </header>
         <div style={{ padding: '20px', color: 'var(--text-secondary)', textAlign: 'center' }}>
@@ -26,7 +26,7 @@ function App() {
     <div className="app-container">
       <aside className="sidebar">
         <div className="sidebar-header">
-          <h2>Заметки</h2>
+          <h2>СПИСОК ДЕЛ</h2>
           <button 
             type="button" 
             className="new-note-btn"
