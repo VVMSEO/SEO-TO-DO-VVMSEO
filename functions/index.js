@@ -29,12 +29,17 @@ exports.sendtelegramreminders = onSchedule("every 1 minutes", async (event) => {
 
     snapshot.forEach(doc => {
       const task = doc.data();
-      if (!task.dueDate || !task.dueTime || !task.telegramChatId) return;
+      
+      const dateToCheck = task.reminderDate || task.dueDate;
+      const timeToCheck = task.reminderTime || task.dueTime;
+      
+      if (!dateToCheck || !timeToCheck || !task.telegramChatId) return;
 
-      const taskDateTime = new Date(`${task.dueDate}T${task.dueTime}`);
+      const taskDateTime = new Date(`${dateToCheck}T${timeToCheck}`);
       
       if (taskDateTime <= now) {
-        const message = `🔔 Напоминание: ${task.title}\n\n${task.note || ''}`;
+        const title = task.title || 'Новая задача';
+        const message = `🔔 Напоминание: ${title}\n\n${task.note || ''}`;
         
         const fetchPromise = fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
           method: 'POST',

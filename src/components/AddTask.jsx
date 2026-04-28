@@ -8,8 +8,11 @@ export default function AddTask({ selectedTask, onClose }) {
   const [note, setNote] = useState('');
   const [dueDate, setDueDate] = useState('');
   const [dueTime, setDueTime] = useState('');
+  const [reminderDate, setReminderDate] = useState('');
+  const [reminderTime, setReminderTime] = useState('');
   const [telegramChatId, setTelegramChatId] = useState('');
   const [error, setError] = useState('');
+  const [showReminderParams, setShowReminderParams] = useState(false);
 
   useEffect(() => {
     if (selectedTask) {
@@ -17,12 +20,18 @@ export default function AddTask({ selectedTask, onClose }) {
       setNote(selectedTask.note || '');
       setDueDate(selectedTask.dueDate || '');
       setDueTime(selectedTask.dueTime || '');
+      setReminderDate(selectedTask.reminderDate || '');
+      setReminderTime(selectedTask.reminderTime || '');
       setTelegramChatId(selectedTask.telegramChatId || localStorage.getItem('telegramChatId') || '');
+      setShowReminderParams(!!(selectedTask.reminderDate || selectedTask.reminderTime));
       setError('');
     } else {
       setTitle('');
       setNote('');
       setError('');
+      setShowReminderParams(false);
+      setReminderDate('');
+      setReminderTime('');
       
       const savedChatId = localStorage.getItem('telegramChatId');
       if (savedChatId) {
@@ -55,24 +64,38 @@ export default function AddTask({ selectedTask, onClose }) {
       localStorage.setItem('telegramChatId', telegramChatId);
     }
 
+    const taskData = {
+      title: title.trim(),
+      note: note.trim(),
+      dueDate,
+      dueTime,
+      telegramChatId: telegramChatId.trim()
+    };
+
+    if (showReminderParams && reminderDate && reminderTime) {
+      taskData.reminderDate = reminderDate;
+      taskData.reminderTime = reminderTime;
+    } else {
+      taskData.reminderDate = null;
+      taskData.reminderTime = null;
+    }
+
     try {
       if (selectedTask) {
         const taskRef = doc(db, 'tasks', selectedTask.id);
+        const hasTimeChanged = 
+          selectedTask.dueDate !== dueDate || 
+          selectedTask.dueTime !== dueTime || 
+          selectedTask.reminderDate !== taskData.reminderDate ||
+          selectedTask.reminderTime !== taskData.reminderTime;
+          
         await updateDoc(taskRef, {
-          title: title.trim(),
-          note: note.trim(),
-          dueDate,
-          dueTime,
-          telegramChatId: telegramChatId.trim(),
-          ...(selectedTask.dueDate !== dueDate || selectedTask.dueTime !== dueTime ? { reminded: false } : {})
+          ...taskData,
+          ...(hasTimeChanged ? { reminded: false } : {})
         });
       } else {
         await addDoc(collection(db, 'tasks'), {
-          title: title.trim(),
-          note: note.trim(),
-          dueDate,
-          dueTime,
-          telegramChatId: telegramChatId.trim(),
+          ...taskData,
           done: false,
           reminded: false,
           createdAt: serverTimestamp()
@@ -113,7 +136,7 @@ export default function AddTask({ selectedTask, onClose }) {
         className="add-task-input-desc"
       />
       <div className="add-task-meta">
-        <label className="add-task-meta-item" title="Дата">
+        <label className="add-task-meta-item" title="Дата дедлайна">
           <Calendar size={14} />
           <input
             type="date"
@@ -121,14 +144,48 @@ export default function AddTask({ selectedTask, onClose }) {
             onChange={(e) => setDueDate(e.target.value)}
           />
         </label>
-        <label className="add-task-meta-item" title="Время">
+        <label className="add-task-meta-item" title="Время дедлайна">
           <input
             type="time"
             value={dueTime}
             onChange={(e) => setDueTime(e.target.value)}
           />
         </label>
-        <label className="add-task-meta-item" title="Telegram Chat ID">
+        
+        <div style={{ display: 'flex', alignItems: 'center', marginLeft: 'auto', gap: '8px' }}>
+          <label style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '4px', cursor: 'pointer' }}>
+            <input 
+              type="checkbox" 
+              checked={showReminderParams}
+              onChange={(e) => setShowReminderParams(e.target.checked)}
+            />
+            Свое время напоминания
+          </label>
+        </div>
+      </div>
+
+      {showReminderParams && (
+        <div className="add-task-meta" style={{ marginTop: '-4px' }}>
+          <label className="add-task-meta-item" title="Дата напоминания" style={{ borderColor: 'var(--accent-red)' }}>
+            <Calendar size={14} color="var(--accent-red)" />
+            <input
+              type="date"
+              value={reminderDate}
+              onChange={(e) => setReminderDate(e.target.value)}
+            />
+          </label>
+          <label className="add-task-meta-item" title="Время напоминания" style={{ borderColor: 'var(--accent-red)' }}>
+            <input
+              type="time"
+              value={reminderTime}
+              onChange={(e) => setReminderTime(e.target.value)}
+            />
+          </label>
+        </div>
+      )}
+
+      <div className="add-task-meta">
+        <label className="add-task-meta-item" title="Telegram Chat ID" style={{ width: '100%' }}>
           <Hash size={14} />
           <input
             type="text"
@@ -138,6 +195,7 @@ export default function AddTask({ selectedTask, onClose }) {
               setTelegramChatId(e.target.value);
               localStorage.setItem('telegramChatId', e.target.value);
             }}
+            style={{ width: '100%' }}
           />
         </label>
       </div>
