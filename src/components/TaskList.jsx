@@ -1,9 +1,13 @@
 import { useState, useEffect } from 'react';
-import { collection, query, onSnapshot, doc, updateDoc, deleteDoc } from 'firebase/firestore';
+import { collection, query, onSnapshot, doc, updateDoc, deleteDoc, addDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../firebase';
+import { Calendar, Plus, Maximize2, MoreHorizontal, Check } from 'lucide-react';
+import AddTask from './AddTask'; // Create an inline version
 
-export default function TaskList({ onSelectTask, selectedTaskId }) {
+export default function TaskList({ currentView }) {
   const [tasks, setTasks] = useState([]);
+  const [isAddingTask, setIsAddingTask] = useState(false);
+  const [editingTaskId, setEditingTaskId] = useState(null);
 
   useEffect(() => {
     const q = query(collection(db, 'tasks'));
@@ -12,15 +16,6 @@ export default function TaskList({ onSelectTask, selectedTaskId }) {
         id: doc.id,
         ...doc.data()
       }));
-      
-      // Sort: undone first, then by dueDate + dueTime ascending
-      tasksData.sort((a, b) => {
-        if (a.done !== b.done) return a.done ? 1 : -1;
-        const dateTimeA = `${a.dueDate}T${a.dueTime}`;
-        const dateTimeB = `${b.dueDate}T${b.dueTime}`;
-        return dateTimeA.localeCompare(dateTimeB);
-      });
-      
       setTasks(tasksData);
     }, (error) => {
       console.error("Error fetching tasks:", error);
@@ -30,169 +25,125 @@ export default function TaskList({ onSelectTask, selectedTaskId }) {
   }, []);
 
   const toggleDone = async (task) => {
-    // Optimistic update
     setTasks(prev => prev.map(t => t.id === task.id ? { ...t, done: !t.done } : t));
     try {
-      const taskRef = doc(db, 'tasks', task.id);
-      await updateDoc(taskRef, { done: !task.done });
+      await updateDoc(doc(db, 'tasks', task.id), { done: !task.done });
     } catch (error) {
       console.error("Error updating task:", error);
-      // Revert on error
       setTasks(prev => prev.map(t => t.id === task.id ? { ...t, done: task.done } : t));
     }
   };
 
   const deleteTask = async (id) => {
-    // Optimistic update
     const previousTasks = [...tasks];
     setTasks(prev => prev.filter(t => t.id !== id));
     try {
       await deleteDoc(doc(db, 'tasks', id));
     } catch (error) {
       console.error("Error deleting task:", error);
-      // Revert on error
       setTasks(previousTasks);
     }
   };
 
-  const isOverdue = (dueDate, dueTime) => {
-    const now = new Date();
-    const taskDate = new Date(`${dueDate}T${dueTime}`);
-    return taskDate < now;
-  };
-
   const formatDate = (dateStr) => {
     if (!dateStr) return '';
-    const [yyyy, mm, dd] = dateStr.split('-');
-    return `${dd}.${mm}.${yyyy}`;
+    const date = new Date(dateStr);
+    const months = ['янв', 'февр', 'мар', 'апр', 'мая', 'июн', 'июл', 'авг', 'сент', 'окт', 'нояб', 'дек'];
+    return `${date.getDate()} ${months[date.getMonth()]}`;
   };
 
-  const maskChatId = (chatId) => {
-    if (!chatId) return '';
-    return `***${chatId.slice(-4)}`;
+  const isOverdue = (task) => {
+    if (!task.dueDate || !task.dueTime) return false;
+    const now = new Date();
+    const taskDate = new Date(`${task.dueDate}T${task.dueTime}`);
+    return taskDate < now && !task.done;
   };
 
-  const categorizeTasks = (tasksList) => {
-    const groups = {
-      overdue: [],
-      today: [],
-      tomorrow: [],
-      upcoming: [],
-      completed: []
-    };
-
+  const filterTasks = () => {
     const now = new Date();
     const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
     
-    const tomorrowDate = new Date(now);
-    tomorrowDate.setDate(tomorrowDate.getDate() + 1);
-    const tomorrowStr = `${tomorrowDate.getFullYear()}-${String(tomorrowDate.getMonth() + 1).padStart(2, '0')}-${String(tomorrowDate.getDate()).padStart(2, '0')}`;
-
-    tasksList.forEach(task => {
-      if (task.done) {
-        groups.completed.push(task);
-        return;
-      }
-
-      if (!task.dueDate || !task.dueTime) {
-        groups.upcoming.push(task);
-        return;
-      }
-
-      const taskDateTime = new Date(`${task.dueDate}T${task.dueTime}`);
-      if (taskDateTime < now) {
-        groups.overdue.push(task);
-      } else if (task.dueDate === todayStr) {
-        groups.today.push(task);
-      } else if (task.dueDate === tomorrowStr) {
-        groups.tomorrow.push(task);
-      } else {
-        groups.upcoming.push(task);
+    return tasks.filter(task => {
+      if (task.done) return false; // Hide done tasks by default for a cleaner look
+      
+      switch (currentView) {
+        case 'inbox':
+          return true; // Show all active
+        case 'today':
+          return task.dueDate === todayStr || isOverdue(task);
+        case 'upcoming':
+          return task.dueDate > todayStr;
+        default:
+          return true;
       }
     });
-
-    return groups;
   };
 
-  const groupedTasks = categorizeTasks(tasks);
-
-  const renderTaskCard = (task, isOverdue = false) => (
-    <div 
-      key={task.id} 
-      className={`task-card ${isOverdue ? 'overdue' : ''} ${task.done ? 'done' : ''} ${selectedTaskId === task.id ? 'selected' : ''}`}
-      onClick={() => onSelectTask(task)}
-    >
-      <div className="task-card-header">
-        <div className="task-title">{task.title}</div>
-        <div className="task-actions">
-          <input 
-            type="checkbox" 
-            checked={task.done} 
-            onChange={(e) => {
-              e.stopPropagation();
-              toggleDone(task);
-            }}
-            className="checkbox-input" 
-            title={task.done ? "Восстановить" : "Выполнено"} 
-          />
-          <button 
-            onClick={(e) => {
-              e.stopPropagation();
-              deleteTask(task.id);
-              if (selectedTaskId === task.id) onSelectTask(null);
-            }} 
-            className="delete-btn" 
-            title="Удалить"
-          >
-            ✕
-          </button>
-        </div>
-      </div>
-      <div className="task-meta-info">
-        {formatDate(task.dueDate)} {task.dueTime} • ID: {maskChatId(task.telegramChatId)}
-      </div>
-      {task.note && <div className="task-note-preview">{task.note}</div>}
-    </div>
-  );
+  const filteredTasks = filterTasks();
 
   return (
     <div className="task-list">
-      {groupedTasks.overdue.length > 0 && (
-        <>
-          <div className="list-title">Просроченные</div>
-          {groupedTasks.overdue.map(task => renderTaskCard(task, true))}
-        </>
-      )}
+      {filteredTasks.map(task => {
+        const overdue = isOverdue(task);
+        
+        if (editingTaskId === task.id) {
+          return (
+            <AddTask 
+              key={task.id} 
+              selectedTask={task} 
+              onClose={() => setEditingTaskId(null)} 
+            />
+          );
+        }
 
-      {groupedTasks.today.length > 0 && (
-        <>
-          <div className="list-title" style={{ marginTop: groupedTasks.overdue.length ? '24px' : '0' }}>Сегодня</div>
-          {groupedTasks.today.map(task => renderTaskCard(task))}
-        </>
-      )}
+        return (
+          <div key={task.id} className={`task-card ${overdue ? 'overdue' : ''} ${task.done ? 'done' : ''}`} onClick={() => setEditingTaskId(task.id)}>
+            <div className="task-checkbox-container" onClick={(e) => { e.stopPropagation(); toggleDone(task); }}>
+              <div className={`task-checkbox ${task.done ? 'done' : ''}`}>
+                {task.done && <Check size={12} />}
+              </div>
+            </div>
+            
+            <div className="task-content">
+              <div className="task-title">{task.title}</div>
+              {task.note && <div className="task-note-preview">{task.note}</div>}
+              
+              <div className="task-meta-info">
+                {task.dueDate && (
+                  <span className={`task-meta-item ${overdue ? 'overdue' : ''}`}>
+                    <Calendar size={12} />
+                    {formatDate(task.dueDate)} {task.dueTime ? task.dueTime : ''}
+                  </span>
+                )}
+                {task.telegramChatId && (
+                  <span className="task-meta-item" style={{ color: 'var(--text-muted)' }}>
+                    ID: ***{task.telegramChatId.slice(-4)}
+                  </span>
+                )}
+              </div>
+            </div>
 
-      {groupedTasks.tomorrow.length > 0 && (
-        <>
-          <div className="list-title" style={{ marginTop: (groupedTasks.overdue.length || groupedTasks.today.length) ? '24px' : '0' }}>Завтра</div>
-          {groupedTasks.tomorrow.map(task => renderTaskCard(task))}
-        </>
-      )}
+            <div className="task-actions">
+              <MoreHorizontal size={16} className="task-action" onClick={(e) => { e.stopPropagation(); /* Menu placeholder */ }} />
+              <button 
+                onClick={(e) => { e.stopPropagation(); deleteTask(task.id); }} 
+                className="btn-cancel" 
+                style={{ padding: '4px' }}
+                title="Удалить"
+              >✕</button>
+            </div>
+          </div>
+        );
+      })}
 
-      {groupedTasks.upcoming.length > 0 && (
-        <>
-          <div className="list-title" style={{ marginTop: (groupedTasks.overdue.length || groupedTasks.today.length || groupedTasks.tomorrow.length) ? '24px' : '0' }}>Предстоящие</div>
-          {groupedTasks.upcoming.map(task => renderTaskCard(task))}
-        </>
+      {!isAddingTask ? (
+        <div className="inline-add-btn" onClick={() => setIsAddingTask(true)}>
+          <Plus size={16} />
+          <span>Добавить задачу</span>
+        </div>
+      ) : (
+        <AddTask onClose={() => setIsAddingTask(false)} />
       )}
-      
-      {groupedTasks.completed.length > 0 && (
-        <>
-          <div className="list-title" style={{ marginTop: '24px' }}>Завершенные</div>
-          {groupedTasks.completed.map(task => renderTaskCard(task))}
-        </>
-      )}
-      
-      {tasks.length === 0 && <p className="empty-state">Нет задач.</p>}
     </div>
   );
 }
