@@ -11,6 +11,8 @@ export default function AddTask({ selectedTask, onClose }) {
   const [reminderDate, setReminderDate] = useState('');
   const [reminderTime, setReminderTime] = useState('');
   const [telegramChatId, setTelegramChatId] = useState('');
+  const [project, setProject] = useState('');
+  const [tag, setTag] = useState('');
   const [error, setError] = useState('');
   const [showReminderParams, setShowReminderParams] = useState(false);
 
@@ -23,6 +25,8 @@ export default function AddTask({ selectedTask, onClose }) {
       setReminderDate(selectedTask.reminderDate || '');
       setReminderTime(selectedTask.reminderTime || '');
       setTelegramChatId(selectedTask.telegramChatId || localStorage.getItem('telegramChatId') || '');
+      setProject(selectedTask.project || '');
+      setTag(selectedTask.tag || '');
       setShowReminderParams(!!(selectedTask.reminderDate || selectedTask.reminderTime));
       setError('');
     } else {
@@ -32,6 +36,8 @@ export default function AddTask({ selectedTask, onClose }) {
       setShowReminderParams(false);
       setReminderDate('');
       setReminderTime('');
+      setProject('');
+      setTag('');
       
       const savedChatId = localStorage.getItem('telegramChatId');
       if (savedChatId) {
@@ -69,7 +75,9 @@ export default function AddTask({ selectedTask, onClose }) {
       note: note.trim(),
       dueDate,
       dueTime,
-      telegramChatId: telegramChatId.trim()
+      telegramChatId: telegramChatId.trim(),
+      project: project.trim(),
+      tag: tag.trim()
     };
 
     if (showReminderParams && reminderDate && reminderTime) {
@@ -185,7 +193,7 @@ export default function AddTask({ selectedTask, onClose }) {
       )}
 
       <div className="add-task-meta">
-        <label className="add-task-meta-item" title="Telegram Chat ID" style={{ width: '100%' }}>
+        <label className="add-task-meta-item" title="Telegram Chat ID" style={{ flex: 1 }}>
           <Hash size={14} />
           <input
             type="text"
@@ -195,6 +203,24 @@ export default function AddTask({ selectedTask, onClose }) {
               setTelegramChatId(e.target.value);
               localStorage.setItem('telegramChatId', e.target.value);
             }}
+            style={{ width: '100%' }}
+          />
+        </label>
+        <label className="add-task-meta-item" title="Метка" style={{ flex: 1 }}>
+          <input
+            type="text"
+            placeholder="Метка"
+            value={tag}
+            onChange={(e) => setTag(e.target.value)}
+            style={{ width: '100%' }}
+          />
+        </label>
+        <label className="add-task-meta-item" title="Проект" style={{ flex: 1 }}>
+          <input
+            type="text"
+            placeholder="Проект"
+            value={project}
+            onChange={(e) => setProject(e.target.value)}
             style={{ width: '100%' }}
           />
         </label>

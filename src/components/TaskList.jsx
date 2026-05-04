@@ -4,10 +4,16 @@ import { db } from '../firebase';
 import { Calendar, Plus, Maximize2, MoreHorizontal, Check } from 'lucide-react';
 import AddTask from './AddTask'; // Create an inline version
 
-export default function TaskList({ currentView }) {
+export default function TaskList({ currentView, searchQuery, currentProject, triggerAddTask }) {
   const [tasks, setTasks] = useState([]);
   const [isAddingTask, setIsAddingTask] = useState(false);
   const [editingTaskId, setEditingTaskId] = useState(null);
+
+  useEffect(() => {
+    if (triggerAddTask > 0) {
+      setIsAddingTask(true);
+    }
+  }, [triggerAddTask]);
 
   useEffect(() => {
     const q = query(collection(db, 'tasks'));
@@ -66,6 +72,22 @@ export default function TaskList({ currentView }) {
     return tasks.filter(task => {
       if (task.done) return false; // Hide done tasks by default for a cleaner look
       
+      if (currentView === 'search') {
+        const query = (searchQuery || '').toLowerCase();
+        if (!query) return true;
+        const inTitle = task.title && task.title.toLowerCase().includes(query);
+        const inNote = task.note && task.note.toLowerCase().includes(query);
+        return inTitle || inNote;
+      }
+      
+      if (currentView === 'project') {
+        return task.project === currentProject;
+      }
+      
+      if (currentView === 'tag') {
+        return task.tag === currentProject;
+      }
+
       switch (currentView) {
         case 'inbox':
           return true; // Show all active
@@ -118,6 +140,16 @@ export default function TaskList({ currentView }) {
                 {task.telegramChatId && (
                   <span className="task-meta-item" style={{ color: 'var(--text-muted)' }}>
                     ID: ***{task.telegramChatId.slice(-4)}
+                  </span>
+                )}
+                {task.project && (
+                  <span className="task-meta-item" style={{ background: 'var(--bg-hover)', color: 'var(--text-secondary)', padding: '2px 6px', borderRadius: '4px' }}>
+                    Проект: {task.project}
+                  </span>
+                )}
+                {task.tag && (
+                  <span className="task-meta-item" style={{ background: 'rgba(235, 137, 9, 0.1)', color: '#eb8909', padding: '2px 6px', borderRadius: '4px' }}>
+                    #{task.tag}
                   </span>
                 )}
               </div>
